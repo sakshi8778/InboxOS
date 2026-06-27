@@ -94,14 +94,6 @@ npm run dev
 
 ---
 
-## 🗺️ Roadmap
-
-- **v1 (Weeks 1-4):** Gmail connector, AI classification, WhatsApp alerts, dashboard
-- **v2 (Weeks 5-8):** Multi-channel, smart routing, calendar integration, expense tracking
-- **v3 (Weeks 9-12):** Plugin system, local AI, reply assistant, team inbox
-
----
-
 ## 🤝 Contributing
 
 See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for module ownership, code standards, and PR guidelines.
