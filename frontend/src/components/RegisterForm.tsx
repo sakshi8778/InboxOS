@@ -255,7 +255,8 @@ export const RegisterForm: React.FC = () => {
           type="button"
           onClick={async () => {
             try {
-              const res = await fetch('http://localhost:8000/api/auth/google', { credentials: 'include' });
+              const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+              const res = await fetch(`${apiBase}/api/auth/google`, { credentials: 'include' });
               const data = await res.json();
               if (data.url) window.location.href = data.url;
             } catch (e) { console.error('Google sign-in failed', e); }
