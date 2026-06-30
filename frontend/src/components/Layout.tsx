@@ -6,7 +6,6 @@ import {
   Settings, 
   Search, 
   Bell, 
-  ChevronRight, 
   Plus, 
   Sparkles, 
   Activity, 

@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { Layout } from './components/Layout';
 import { 
   ShieldAlert, 
-  ArrowUpRight, 
   CheckCircle2, 
   Clock, 
-  MessageSquare, 
   Sparkles,
   TrendingUp,
   Inbox,
