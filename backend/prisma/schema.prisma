@@ -36,6 +36,8 @@ model UserSettings {
   dndEnabled      Boolean  @default(false)
   dndStart        String?  // e.g. "22:00"
   dndEnd          String?  // e.g. "08:00"
+  timezone        String   @default("UTC")
+  digestSchedule  String   @default("daily") // 'daily' | 'weekly' | 'disabled'
 
   userId    String  @unique
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -72,6 +74,10 @@ model Email {
 
   analysis  EmailAnalysis?
   calendarEvents CalendarEvent[]
+  digestId  String?
+  digest    Digest?        @relation(fields: [digestId], references: [id])
+  expenses  Expense[]
+  reminders Reminder[]
 
   @@index([userId])
   @@index([threadId])
@@ -224,33 +230,40 @@ model CalendarEvent {
 }
 
 model Expense {
-  id          String   @id @default(uuid())
-  userId      String
-  emailId     String?
-  merchant    String?
-  amount      Float?
-  currency    String?  @default("USD")
-  category    String?
-  date        DateTime?
-  rawData     Json?
-  createdAt   DateTime @default(now())
+  id            String    @id @default(uuid())
+  userId        String
+  emailId       String?
+  amount        Float?
+  amountUsd     Float?    // Store USD equivalent
+  currency      String?   @default("USD")
+  merchantName  String?
+  category      String?
+  date          DateTime?
+  paymentMethod String?
+  items         Json?     // itemsJSONB
+  isRecurring   Boolean   @default(false)
+  createdAt     DateTime  @default(now())
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email Email? @relation(fields: [emailId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([emailId])
   @@map("expenses")
 }
 
 model Digest {
-  id          String   @id @default(uuid())
-  userId      String
-  type        String   @default("daily") // 'daily' | 'weekly'
-  content     String
-  emailCount  Int      @default(0)
-  sentAt      DateTime?
-  createdAt   DateTime @default(now())
+  id        String    @id @default(uuid())
+  userId    String
+  type      String    @default("daily") // 'daily' | 'weekly'
+  content   Json      // JSONB content
+  emailIds  String[]
+  sentAt    DateTime?
+  status    String    @default("pending") // 'pending' | 'sent' | 'failed'
+  createdAt DateTime  @default(now())
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails Email[]
 
   @@index([userId])
   @@map("digests")
@@ -277,15 +290,17 @@ model Reminder {
   id          String   @id @default(uuid())
   userId      String
   emailId     String?
-  title       String
-  dueAt       DateTime
-  isSent      Boolean  @default(false)
+  deadline    DateTime
+  offsets     Int[]
+  status      String   @default("active") // 'active' | 'triggered' | 'snoozed' | 'cancelled'
+  snoozeUntil DateTime?
   createdAt   DateTime @default(now())
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email Email? @relation(fields: [emailId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([dueAt])
+  @@index([emailId])
   @@map("reminders")
 }
 
