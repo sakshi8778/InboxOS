@@ -27,6 +27,7 @@ import { Server as SocketIoServer } from 'socket.io';
 import { WebSocketService } from './services/websocket.service';
 import { TelegramBotService } from './services/telegram-bot.service';
 import { TelegramNotificationService } from './services/telegram-notification.service';
+import { ReminderSchedulerService } from './services/actions/reminder-scheduler.service';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -1300,6 +1301,211 @@ app.get('/api/auth/google', (req: Request, res: Response) => {
   return res.json({ url });
 });
 
+// ─── Reminder System Routes ───────────────────────────────────────────────────
+
+/**
+ * GET /api/reminders/upcoming
+ * Returns active reminders (PENDING/SNOOZED) within next 7 days for the user.
+ */
+app.get(
+  '/api/reminders/upcoming',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const now = new Date();
+      const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      const reminders = await prisma.reminder.findMany({
+        where: {
+          userId,
+          status: { in: ['PENDING', 'SNOOZED'] },
+          deadline: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) }, // include up to 24h overdue
+        },
+        orderBy: { deadline: 'asc' },
+        take: 20,
+        include: {
+          email: { select: { subject: true, sender: true } },
+        },
+      });
+
+      return res.json({ reminders, total: reminders.length });
+    } catch (err: any) {
+      logger.error('GET /api/reminders/upcoming error:', err);
+      return res.status(500).json({ error: 'Failed to fetch reminders' });
+    }
+  }
+);
+
+/**
+ * POST /api/reminders/:id/snooze
+ * Snoozes a reminder for durationMinutes.
+ */
+app.post(
+  '/api/reminders/:id/snooze',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const id = req.params.id as string;
+      const { durationMinutes } = req.body;
+
+      if (!durationMinutes || typeof durationMinutes !== 'number' || durationMinutes <= 0) {
+        return res.status(400).json({ error: 'durationMinutes must be a positive number' });
+      }
+
+      const reminder = await prisma.reminder.findUnique({ where: { id } });
+      if (!reminder || reminder.userId !== userId) {
+        return res.status(404).json({ error: 'Reminder not found' });
+      }
+
+      const updated = await ReminderSchedulerService.snoozeReminder(id, durationMinutes);
+      return res.json({ message: 'Reminder snoozed', reminder: updated });
+    } catch (err: any) {
+      logger.error('POST /api/reminders/:id/snooze error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to snooze reminder' });
+    }
+  }
+);
+
+/**
+ * POST /api/reminders/:id/cancel
+ * Cancels a specific reminder.
+ */
+app.post(
+  '/api/reminders/:id/cancel',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const id = req.params.id as string;
+      const reminder = await prisma.reminder.findUnique({ where: { id } });
+      if (!reminder || reminder.userId !== userId) {
+        return res.status(404).json({ error: 'Reminder not found' });
+      }
+
+      await ReminderSchedulerService.cancelReminders(reminder.emailId);
+      return res.json({ message: 'Reminder cancelled' });
+    } catch (err: any) {
+      logger.error('POST /api/reminders/:id/cancel error:', err);
+      return res.status(500).json({ error: 'Failed to cancel reminder' });
+    }
+  }
+);
+
+/**
+ * GET /api/notifications
+ * Returns unread notifications for the authenticated user.
+ */
+app.get(
+  '/api/notifications',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const limit = parseInt(req.query.limit as string) || 20;
+      const unreadOnly = req.query.unread !== 'false';
+
+      const notifications = await prisma.notification.findMany({
+        where: { userId, ...(unreadOnly && { isRead: false }) },
+        orderBy: { sentAt: 'desc' },
+        take: limit,
+        include: {
+          reminder: { select: { deadline: true, emailId: true } },
+        },
+      });
+
+      return res.json({ notifications, total: notifications.length });
+    } catch (err: any) {
+      logger.error('GET /api/notifications error:', err);
+      return res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+  }
+);
+
+/**
+ * PATCH /api/notifications/:id/read
+ * Marks a notification as read.
+ */
+app.patch(
+  '/api/notifications/:id/read',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const id = req.params.id as string;
+      const notif = await prisma.notification.findUnique({ where: { id } });
+      if (!notif || notif.userId !== userId) {
+        return res.status(404).json({ error: 'Notification not found' });
+      }
+
+      await prisma.notification.update({ where: { id }, data: { isRead: true } });
+      return res.json({ message: 'Notification marked as read' });
+    } catch (err: any) {
+      logger.error('PATCH /api/notifications/:id/read error:', err);
+      return res.status(500).json({ error: 'Failed to mark notification' });
+    }
+  }
+);
+
+/**
+ * PATCH /api/action-items/:id/done
+ * Marks an action item as completed and cancels associated reminders.
+ */
+app.patch(
+  '/api/action-items/:id/done',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const id = req.params.id as string;
+
+      // Fetch action item + verify ownership via email
+      const actionItem = await prisma.actionItem.findUnique({ where: { id } });
+      if (!actionItem) {
+        return res.status(404).json({ error: 'Action item not found' });
+      }
+
+      // Verify the parent email belongs to this user
+      const parentEmail = await prisma.email.findUnique({
+        where: { id: actionItem.emailId },
+        select: { userId: true },
+      });
+      if (!parentEmail || parentEmail.userId !== userId) {
+        return res.status(404).json({ error: 'Action item not found' });
+      }
+
+      // Mark action item done
+      const updated = await prisma.actionItem.update({
+        where: { id },
+        data: { isCompleted: true },
+      });
+
+      // Cancel all pending reminders for this email (non-blocking)
+      ReminderSchedulerService.cancelReminders(actionItem.emailId).catch((err: any) => {
+        logger.error('Failed to cancel reminders on action done:', err);
+      });
+
+      return res.json({ message: 'Action item marked done', actionItem: updated });
+    } catch (err: any) {
+      logger.error('PATCH /api/action-items/:id/done error:', err);
+      return res.status(500).json({ error: 'Failed to mark action item done' });
+    }
+  }
+);
+
 // Start Server
 
 const server = app.listen(PORT, () => {
@@ -1321,6 +1527,9 @@ const server = app.listen(PORT, () => {
   TelegramBotService.init().catch((err) => {
     logger.error('Failed to initialize Telegram Bot Service:', err);
   });
+
+  // Initialize Reminder Worker (BullMQ)
+  ReminderSchedulerService.initWorker();
 });
 
 // Initialize Socket.io Server with client-credentials CORS configuration
@@ -1346,6 +1555,9 @@ WebSocketService.initialize(io);
 const gracefulShutdown = () => {
   logger.info('Received shutdown signal. Starting graceful cleanup...');
   TelegramBotService.shutdown();
+  ReminderSchedulerService.shutdown().catch((err) =>
+    logger.error('Failed to shutdown ReminderScheduler:', err)
+  );
   server.close(() => {
     logger.info('HTTP server closed.');
     prisma.$disconnect().then(() => {

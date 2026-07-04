@@ -11,6 +11,7 @@
     "test:actions": "ts-node src/test-action-items.ts",
     "test:embeddings": "ts-node src/test-embeddings.ts",
     "worker": "ts-node src/worker.ts",
+    "reminder-worker": "ts-node src/reminder-worker.ts",
     "start": "ts-node src/server.ts",
     "test:worker": "ts-node src/test-worker.ts",
     "test:discord": "ts-node src/test-discord.ts",
