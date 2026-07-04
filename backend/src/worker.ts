@@ -27,7 +27,10 @@ calendarEventsWorker.on('completed', (job) => {
   console.log(`[BullMQ] Calendar Event Job ${job.id} completed successfully.`);
 });
 calendarEventsWorker.on('failed', (job, err) => {
-  console.error(`[BullMQ] Calendar Event Job ${job?.id} failed with error:`, err);
+  console.error(
+    `[BullMQ] Calendar Event Job ${job?.id} failed with error:`,
+    err
+  );
 });
 
 export async function registerWorkerHandlers() {

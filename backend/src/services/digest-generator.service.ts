@@ -13,7 +13,11 @@ export class DigestGeneratorService {
     type: 'daily' | 'weekly' = 'daily',
     limit: number = 20
   ) {
-    logger.info('[DigestGenerator] Starting digest generation', { userId, type, limit });
+    logger.info('[DigestGenerator] Starting digest generation', {
+      userId,
+      type,
+      limit,
+    });
 
     // Determine time window
     const since = new Date();
@@ -40,7 +44,10 @@ export class DigestGeneratorService {
     });
 
     if (emails.length === 0) {
-      logger.info('[DigestGenerator] No emails found for digest period', { userId, type });
+      logger.info('[DigestGenerator] No emails found for digest period', {
+        userId,
+        type,
+      });
       const emptyDigest = await prisma.digest.create({
         data: {
           userId,
@@ -77,9 +84,15 @@ Write the digest in a professional, readable format:`;
     try {
       content = await AIService.generateReply(prompt);
     } catch (aiErr: any) {
-      logger.warn('[DigestGenerator] AI generation failed, falling back to simple digest:', aiErr.message);
+      logger.warn(
+        '[DigestGenerator] AI generation failed, falling back to simple digest:',
+        aiErr.message
+      );
       content = `${type.charAt(0).toUpperCase() + type.slice(1)} Email Digest\n${'='.repeat(40)}\n\n${emails
-        .map((e) => `• ${e.subject} — from ${e.sender} (${e.category || 'general'})`)
+        .map(
+          (e) =>
+            `• ${e.subject} — from ${e.sender} (${e.category || 'general'})`
+        )
         .join('\n')}`;
     }
 
@@ -87,7 +100,11 @@ Write the digest in a professional, readable format:`;
       data: { userId, type, content, emailCount: emails.length },
     });
 
-    logger.info('[DigestGenerator] Digest created', { id: digest.id, userId, emailCount: emails.length });
+    logger.info('[DigestGenerator] Digest created', {
+      id: digest.id,
+      userId,
+      emailCount: emails.length,
+    });
     return digest;
   }
 }

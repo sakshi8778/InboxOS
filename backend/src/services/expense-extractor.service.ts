@@ -17,7 +17,11 @@ export class ExpenseExtractorService {
   /**
    * Use AI to extract expense/receipt information from an email.
    */
-  public static async extractFromEmail(email: { subject: string; body: string; sender: string }): Promise<ExtractedExpense | null> {
+  public static async extractFromEmail(email: {
+    subject: string;
+    body: string;
+    sender: string;
+  }): Promise<ExtractedExpense | null> {
     const prompt = `You are an expense extraction assistant. Extract receipt/expense data from the following email and respond ONLY with a valid JSON object (no explanation, no markdown).
 
 Required JSON format:
@@ -35,7 +39,9 @@ Email Body:
 ${email.body.substring(0, 3000)}`;
 
     try {
-      logger.info('[ExpenseExtractor] Extracting expense from email', { subject: email.subject });
+      logger.info('[ExpenseExtractor] Extracting expense from email', {
+        subject: email.subject,
+      });
       const raw = await AIService.generateReply(prompt);
 
       // Parse the JSON response

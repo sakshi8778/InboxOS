@@ -27,12 +27,17 @@ export class ReminderSchedulerService {
 
     if (dueReminders.length === 0) return;
 
-    logger.info('[ReminderScheduler] Processing due reminders', { count: dueReminders.length });
+    logger.info('[ReminderScheduler] Processing due reminders', {
+      count: dueReminders.length,
+    });
 
     for (const reminder of dueReminders) {
       try {
         // Telegram notification if enabled
-        if (reminder.user.settings?.telegramEnabled && reminder.user.settings?.telegramChatId) {
+        if (
+          reminder.user.settings?.telegramEnabled &&
+          reminder.user.settings?.telegramChatId
+        ) {
           await TelegramNotificationService.sendSystemErrorAlert(
             reminder.user.settings.telegramChatId,
             `⏰ Reminder: ${reminder.title}\nDue: ${reminder.dueAt.toISOString()}`
@@ -45,7 +50,10 @@ export class ReminderSchedulerService {
           data: { isSent: true },
         });
 
-        logger.info('[ReminderScheduler] Reminder dispatched', { id: reminder.id, userId: reminder.userId });
+        logger.info('[ReminderScheduler] Reminder dispatched', {
+          id: reminder.id,
+          userId: reminder.userId,
+        });
       } catch (err: any) {
         logger.error('[ReminderScheduler] Failed to dispatch reminder', {
           id: reminder.id,
@@ -73,7 +81,10 @@ export class ReminderSchedulerService {
       },
     });
 
-    logger.info('[ReminderScheduler] Reminder created', { id: reminder.id, dueAt: params.dueAt });
+    logger.info('[ReminderScheduler] Reminder created', {
+      id: reminder.id,
+      dueAt: params.dueAt,
+    });
     return { id: reminder.id };
   }
 }

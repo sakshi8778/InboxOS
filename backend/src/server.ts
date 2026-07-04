@@ -58,7 +58,11 @@ const app = express();
 
 // Initialize Firebase Admin SDK if credentials are provided
 let firebaseAdminApp: any = null;
-if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+if (
+  process.env.FIREBASE_PROJECT_ID &&
+  process.env.FIREBASE_CLIENT_EMAIL &&
+  process.env.FIREBASE_PRIVATE_KEY
+) {
   try {
     firebaseAdminApp = initializeApp({
       credential: cert({
@@ -72,17 +76,22 @@ if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && proc
     logger.error('Failed to initialize Firebase Admin SDK:', err);
   }
 } else {
-  logger.warn('Firebase Admin credentials not fully configured in environment variables.');
+  logger.warn(
+    'Firebase Admin credentials not fully configured in environment variables.'
+  );
 }
 
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 8000;
 
 // Security & performance middleware
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
-}));
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy:
+      process.env.NODE_ENV === 'production' ? undefined : false,
+  })
+);
 app.use(compression());
 
 // Request timeout (30 seconds)
@@ -102,42 +111,33 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:3000',
   'http://127.0.0.1:5173',
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
-  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : []),
+  ...(process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+    : []),
 ];
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
+const corsOrigin = (
+  origin: string | undefined,
+  callback: (error: Error | null, allow?: boolean) => void
+) => {
   if (
-    origin &&
-    (ALLOWED_ORIGINS.some(o => origin === o) ||
-      origin.startsWith('http://localhost:') ||
-      origin.startsWith('http://127.0.0.1:'))
+    !origin ||
+    ALLOWED_ORIGINS.some((o) => origin === o) ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('http://127.0.0.1:')
   ) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+    callback(null, true);
+  } else {
+    logger.warn('CORS origin rejected', {
+      ip: 'unknown',
+      path: 'cors',
+      method: 'OPTIONS',
+      origin,
+    });
+    const error = new Error('Not allowed by CORS') as CorsError;
+    error.code = 'CORS_NOT_ALLOWED';
+    callback(error);
   }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader(
-    'Access-Control-Allow-Methods',
-    'GET,PUT,POST,DELETE,OPTIONS,PATCH'
-  );
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-  );
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
-  }
-
-  logger.warn('CORS origin rejected', {
-    ip: 'unknown',
-    path: 'cors',
-    method: 'OPTIONS',
-    origin,
-  });
-  const error = new Error('Not allowed by CORS') as CorsError;
-  error.code = 'CORS_NOT_ALLOWED';
-  callback(error);
 };
 
 app.use(
@@ -384,14 +384,18 @@ app.post('/api/auth/firebase', async (req: Request, res: Response) => {
     }
 
     if (!firebaseAdminApp) {
-      return res.status(500).json({ error: 'Firebase Admin is not configured on this server.' });
+      return res
+        .status(500)
+        .json({ error: 'Firebase Admin is not configured on this server.' });
     }
 
     // Verify token
     const decodedToken = await getAuth().verifyIdToken(idToken);
     const email = decodedToken.email;
     if (!email) {
-      return res.status(400).json({ error: 'Email not present in Firebase token' });
+      return res
+        .status(400)
+        .json({ error: 'Email not present in Firebase token' });
     }
 
     // Check if user exists
@@ -974,8 +978,10 @@ app.get(
   '/api/integrations/google_calendar/auth',
   requireAuth,
   (req: AuthenticatedRequest, res: Response) => {
-    const redirectUri = (process.env.GMAIL_REDIRECT_URI || 'http://localhost:8000/api/integrations/gmail/callback')
-      .replace('/gmail/callback', '/google_calendar/callback');
+    const redirectUri = (
+      process.env.GMAIL_REDIRECT_URI ||
+      'http://localhost:8000/api/integrations/gmail/callback'
+    ).replace('/gmail/callback', '/google_calendar/callback');
 
     const calendarOauth2Client = new google.auth.OAuth2(
       process.env.GMAIL_CLIENT_ID,
@@ -987,7 +993,7 @@ app.get(
       access_type: 'offline',
       scope: [
         'https://www.googleapis.com/auth/calendar',
-        'https://www.googleapis.com/auth/calendar.events'
+        'https://www.googleapis.com/auth/calendar.events',
       ],
       prompt: 'consent',
       state: req.user?.userId,
@@ -1016,8 +1022,10 @@ app.get(
       const calendarOauth2Client = new google.auth.OAuth2(
         process.env.GMAIL_CLIENT_ID,
         process.env.GMAIL_CLIENT_SECRET,
-        (process.env.GMAIL_REDIRECT_URI || 'http://localhost:8000/api/integrations/gmail/callback')
-          .replace('/gmail/callback', '/google_calendar/callback')
+        (
+          process.env.GMAIL_REDIRECT_URI ||
+          'http://localhost:8000/api/integrations/gmail/callback'
+        ).replace('/gmail/callback', '/google_calendar/callback')
       );
 
       const { tokens } = await calendarOauth2Client.getToken(code);
@@ -1077,19 +1085,30 @@ app.post(
       }
 
       // 2. Extract Event Details
-      const eventData = CalendarExtractorService.extractEventDetails(email.analysis || email);
+      const eventData = CalendarExtractorService.extractEventDetails(
+        email.analysis || email
+      );
       if (!eventData) {
-        return res.status(400).json({ error: 'No meeting details could be extracted from this email' });
+        return res.status(400).json({
+          error: 'No meeting details could be extracted from this email',
+        });
       }
 
       // 3. Attempt creation
       try {
-        const savedEvent = await CalendarCreatorService.createGoogleCalendarEvent(eventData, userId, emailId);
+        const savedEvent =
+          await CalendarCreatorService.createGoogleCalendarEvent(
+            eventData,
+            userId,
+            emailId
+          );
         return res.status(201).json({ success: true, event: savedEvent });
       } catch (err: any) {
         if (err.message === 'MISSING_GOOGLE_CALENDAR_CREDENTIALS') {
-          logger.info(`[CalendarRoute] Missing credentials. Queueing calendar event creation for email: ${emailId}`);
-          
+          logger.info(
+            `[CalendarRoute] Missing credentials. Queueing calendar event creation for email: ${emailId}`
+          );
+
           // Save a placeholder event with 'pending' status in db
           const pendingEvent = await prisma.calendarEvent.upsert({
             where: {
@@ -1112,21 +1131,26 @@ app.post(
             },
           });
 
-          await calendarEventsQueue.add('createEvent', {
-            userId,
-            emailId,
-            eventData,
-          }, {
-            attempts: 5,
-            backoff: {
-              type: 'exponential',
-              delay: 5000,
+          await calendarEventsQueue.add(
+            'createEvent',
+            {
+              userId,
+              emailId,
+              eventData,
             },
-          });
+            {
+              attempts: 5,
+              backoff: {
+                type: 'exponential',
+                delay: 5000,
+              },
+            }
+          );
 
           return res.status(202).json({
             success: true,
-            message: 'Google Calendar credentials missing. Retrying creation in background.',
+            message:
+              'Google Calendar credentials missing. Retrying creation in background.',
             event: pendingEvent,
           });
         }
@@ -1134,7 +1158,9 @@ app.post(
       }
     } catch (error: any) {
       console.error('Error creating calendar event:', error);
-      return res.status(500).json({ error: error.message || 'Internal Server Error' });
+      return res
+        .status(500)
+        .json({ error: error.message || 'Internal Server Error' });
     }
   }
 );
@@ -1410,7 +1436,6 @@ app.put(
   }
 );
 
-
 /**
  * GET /api/dashboard/stats
  * Returns live dashboard metrics/statistics for the authenticated user.
@@ -1439,7 +1464,9 @@ app.get(
       });
       let ingestedChange = 0;
       if (prev24hIngested > 0) {
-        ingestedChange = Math.round(((last24hIngested - prev24hIngested) / prev24hIngested) * 100);
+        ingestedChange = Math.round(
+          ((last24hIngested - prev24hIngested) / prev24hIngested) * 100
+        );
       } else if (last24hIngested > 0) {
         ingestedChange = 100;
       }
@@ -1467,7 +1494,9 @@ app.get(
       });
       let pendingChange = 0;
       if (prev24hPending > 0) {
-        pendingChange = Math.round(((last24hPending - prev24hPending) / prev24hPending) * 100);
+        pendingChange = Math.round(
+          ((last24hPending - prev24hPending) / prev24hPending) * 100
+        );
       } else if (last24hPending > 0) {
         pendingChange = 100;
       }
@@ -1479,20 +1508,30 @@ app.get(
       const completedTasks = await prisma.actionItem.count({
         where: { isCompleted: true, email: { userId } },
       });
-      const resolutionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+      const resolutionRate =
+        totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
       // Previous 24h resolution rate to calculate trend
       const prevTotalTasks = await prisma.actionItem.count({
         where: { email: { userId }, createdAt: { lt: last24h } },
       });
       const prevCompletedTasks = await prisma.actionItem.count({
-        where: { isCompleted: true, email: { userId }, createdAt: { lt: last24h } },
+        where: {
+          isCompleted: true,
+          email: { userId },
+          createdAt: { lt: last24h },
+        },
       });
-      const prevResolutionRate = prevTotalTasks > 0 ? Math.round((prevCompletedTasks / prevTotalTasks) * 100) : 0;
+      const prevResolutionRate =
+        prevTotalTasks > 0
+          ? Math.round((prevCompletedTasks / prevTotalTasks) * 100)
+          : 0;
 
       let resolutionChange = 0;
       if (prevResolutionRate > 0) {
-        resolutionChange = Math.round(((resolutionRate - prevResolutionRate) / prevResolutionRate) * 100);
+        resolutionChange = Math.round(
+          ((resolutionRate - prevResolutionRate) / prevResolutionRate) * 100
+        );
       } else if (resolutionRate > 0) {
         resolutionChange = 100;
       }
@@ -2065,25 +2104,30 @@ app.get('/api/auth/google', (req: Request, res: Response) => {
  * POST /api/auth/refresh
  * Refresh JWT token using existing valid cookie token.
  */
-app.post('/api/auth/refresh', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    const email = req.user?.email;
-    if (!userId || !email) return res.status(401).json({ error: 'Unauthorized' });
+app.post(
+  '/api/auth/refresh',
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.userId;
+      const email = req.user?.email;
+      if (!userId || !email)
+        return res.status(401).json({ error: 'Unauthorized' });
 
-    const newToken = AuthService.generateToken(userId, email);
-    res.cookie('token', newToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000,
-    });
-    return res.json({ message: 'Token refreshed successfully' });
-  } catch (err: any) {
-    logger.error('[Auth] Refresh error:', err.message);
-    return res.status(500).json({ error: 'Failed to refresh token' });
+      const newToken = AuthService.generateToken(userId, email);
+      res.cookie('token', newToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000,
+      });
+      return res.json({ message: 'Token refreshed successfully' });
+    } catch (err: any) {
+      logger.error('[Auth] Refresh error:', err.message);
+      return res.status(500).json({ error: 'Failed to refresh token' });
+    }
   }
-});
+);
 
 /**
  * PUT /api/users/profile
@@ -2103,7 +2147,10 @@ app.put(
 
       const validation = updateProfileSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: 'Invalid payload', details: validation.error.flatten() });
+        return res.status(400).json({
+          error: 'Invalid payload',
+          details: validation.error.flatten(),
+        });
       }
 
       const { email } = validation.data;
@@ -2170,7 +2217,9 @@ app.get(
       const userId = req.user?.userId;
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-      const settings = await prisma.userSettings.findUnique({ where: { userId } });
+      const settings = await prisma.userSettings.findUnique({
+        where: { userId },
+      });
       return res.json({
         dndEnabled: settings?.dndEnabled || false,
         dndStart: settings?.dndStart || null,
@@ -2185,8 +2234,16 @@ app.get(
 
 const dndSchema = z.object({
   dndEnabled: z.boolean(),
-  dndStart: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
-  dndEnd: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  dndStart: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .optional()
+    .nullable(),
+  dndEnd: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .optional()
+    .nullable(),
 });
 
 /**
@@ -2203,18 +2260,34 @@ app.post(
 
       const validation = dndSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: 'Invalid payload', details: validation.error.flatten() });
+        return res.status(400).json({
+          error: 'Invalid payload',
+          details: validation.error.flatten(),
+        });
       }
 
       const { dndEnabled, dndStart, dndEnd } = validation.data;
       const settings = await prisma.userSettings.upsert({
         where: { userId },
-        update: { dndEnabled, dndStart: dndStart ?? null, dndEnd: dndEnd ?? null },
-        create: { userId, dndEnabled, dndStart: dndStart ?? null, dndEnd: dndEnd ?? null },
+        update: {
+          dndEnabled,
+          dndStart: dndStart ?? null,
+          dndEnd: dndEnd ?? null,
+        },
+        create: {
+          userId,
+          dndEnabled,
+          dndStart: dndStart ?? null,
+          dndEnd: dndEnd ?? null,
+        },
       });
 
       logger.info('[Users] DnD settings updated', { userId, dndEnabled });
-      return res.json({ dndEnabled: settings.dndEnabled, dndStart: settings.dndStart, dndEnd: settings.dndEnd });
+      return res.json({
+        dndEnabled: settings.dndEnabled,
+        dndStart: settings.dndStart,
+        dndEnd: settings.dndEnd,
+      });
     } catch (err: any) {
       logger.error('[Users] POST /me/dnd error:', err.message);
       return res.status(500).json({ error: 'Failed to update DnD settings' });
@@ -2236,7 +2309,8 @@ app.post(
       const id = req.params.id as string;
 
       const email = await prisma.email.findUnique({ where: { id } });
-      if (!email || email.userId !== userId) return res.status(404).json({ error: 'Email not found' });
+      if (!email || email.userId !== userId)
+        return res.status(404).json({ error: 'Email not found' });
 
       await prisma.email.update({ where: { id }, data: { status: 'READ' } });
       return res.json({ message: 'Email marked as read' });
@@ -2261,9 +2335,13 @@ app.post(
       const id = req.params.id as string;
 
       const email = await prisma.email.findUnique({ where: { id } });
-      if (!email || email.userId !== userId) return res.status(404).json({ error: 'Email not found' });
+      if (!email || email.userId !== userId)
+        return res.status(404).json({ error: 'Email not found' });
 
-      await prisma.email.update({ where: { id }, data: { status: 'ARCHIVED' } });
+      await prisma.email.update({
+        where: { id },
+        data: { status: 'ARCHIVED' },
+      });
       logger.info('[Emails] Email archived', { id, userId });
       return res.json({ message: 'Email archived successfully' });
     } catch (err: any) {
@@ -2287,7 +2365,8 @@ app.delete(
       const id = req.params.id as string;
 
       const email = await prisma.email.findUnique({ where: { id } });
-      if (!email || email.userId !== userId) return res.status(404).json({ error: 'Email not found' });
+      if (!email || email.userId !== userId)
+        return res.status(404).json({ error: 'Email not found' });
 
       await prisma.email.delete({ where: { id } });
       logger.info('[Emails] Email deleted', { id, userId });
@@ -2351,7 +2430,6 @@ app.use('/api/digests', digestsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/feedback', feedbackRouter);
 app.use('/api/integrations', integrationsRouter);
-
 
 // Start Server
 
