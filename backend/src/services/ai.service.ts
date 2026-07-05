@@ -1010,7 +1010,7 @@ If there are no explicit, concrete tasks, return an empty array.`;
       const embeddingString = `[${queryEmbedding.join(',')}]`;
       let results: any[];
       if (userId) {
-        results = await prisma.$queryRawUnsafe<any[]>(
+        results = (await prisma.$queryRawUnsafe(
           `SELECT id, "messageId", sender, recipient, subject, body, status, category, "createdAt", "userId", "threadId",
                   (1 - (embedding <=> $1::vector)) as similarity
            FROM "Email"
@@ -1020,9 +1020,9 @@ If there are no explicit, concrete tasks, return an empty array.`;
           embeddingString,
           userId,
           limit
-        );
+        )) as any[];
       } else {
-        results = await prisma.$queryRawUnsafe<any[]>(
+        results = (await prisma.$queryRawUnsafe(
           `SELECT id, "messageId", sender, recipient, subject, body, status, category, "createdAt", "userId", "threadId",
                   (1 - (embedding <=> $1::vector)) as similarity
            FROM "Email"
@@ -1031,7 +1031,7 @@ If there are no explicit, concrete tasks, return an empty array.`;
            LIMIT $2`,
           embeddingString,
           limit
-        );
+        )) as any[];
       }
       return results;
     } else {
