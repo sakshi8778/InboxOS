@@ -186,7 +186,7 @@ export const EmailViewer: React.FC<EmailViewerProps> = ({
   >({
     queryKey: ['email-detail', emailId],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/emails/${emailId}`, {
+      const response = await fetch(`${API_BASE}/api/emails/${emailId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
