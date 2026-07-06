@@ -1337,7 +1337,7 @@ app.get('/api/webhooks/config', requireAuth, async (req: AuthenticatedRequest, r
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     const hooks = await prisma.webhookEndpoint.findMany({ where: { userId } });
-    const formatted = hooks.map(h => ({ id: h.id, targetUrl: h.targetUrl, events: JSON.parse(h.events) }));
+    const formatted = hooks.map((h: { id: string; targetUrl: string; events: string }) => ({ id: h.id, targetUrl: h.targetUrl, events: JSON.parse(h.events) }));
     return res.json(formatted);
   } catch (err) {
     return res.status(500).json({ error: 'Failed to fetch webhooks' });
@@ -1933,7 +1933,7 @@ app.put('/api/rules/:id', requireAuth, async (req: AuthenticatedRequest, res: Re
     const { name, description, priority, conditions, actions } = validation.data;
 
     // Run delete-then-create inside a transaction
-    const updatedRule = await prisma.$transaction(async (tx) => {
+    const updatedRule = await prisma.$transaction(async (tx: any) => {
       await tx.ruleCondition.deleteMany({ where: { ruleId: id } });
       await tx.ruleAction.deleteMany({ where: { ruleId: id } });
 
