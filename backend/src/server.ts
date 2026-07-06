@@ -27,6 +27,7 @@ import { initializeApp as firebaseInitializeApp, getApps, cert } from 'firebase-
 import { getAuth as firebaseGetAuth } from 'firebase-admin/auth';
 
 import { setupSwagger } from './config/swagger';
+import { GmailSyncService } from './services/gmail-sync.service';
 
 // ── Firebase Admin SDK Initialization ────────────────────────────────────────
 // Only initialize once; guard against hot-reload double-init in dev mode.
@@ -954,6 +955,11 @@ app.get('/api/integrations/gmail/callback', async (req: Request, res: Response) 
         create: { userId: user.id, provider: 'gmail', emailAddress, encryptedTokens, syncState: 'connected' }
       });
 
+      // Trigger sync in background immediately
+      GmailSyncService.syncLatestEmails(user.id).catch(err => {
+        logger.error('[GmailCallback] Initial Google Sign-in Gmail sync failed:', err);
+      });
+
       return res.redirect('http://localhost:5173/dashboard');
     }
 
@@ -983,7 +989,12 @@ app.get('/api/integrations/gmail/callback', async (req: Request, res: Response) 
       }
     });
 
-    return res.status(200).json({ message: 'Gmail connected successfully', emailAddress });
+    // Trigger sync in background immediately
+    GmailSyncService.syncLatestEmails(userId).catch(err => {
+      logger.error('[GmailCallback] Initial Gmail connect sync failed:', err);
+    });
+
+    return res.redirect('http://localhost:5173/dashboard/settings?tab=integrations');
   } catch (error) {
     console.error('OAuth callback error:', error);
     return res.status(500).json({ error: 'OAuth integration failed' });
@@ -1112,7 +1123,7 @@ app.post('/api/integrations/gmail/sync', requireAuth, async (req: AuthenticatedR
         let body = '';
         const extractBody = (part: any): string => {
           if (part.mimeType === 'text/plain' && part.body?.data) {
-            return Buffer.from(part.body.data, 'base64').toString('utf-8');
+            return Buffer.from(part.body.data, 'base64url').toString('utf-8');
           }
           if (part.parts) {
             for (const p of part.parts) {
