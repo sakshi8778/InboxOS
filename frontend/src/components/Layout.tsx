@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Bell, Moon, Menu, LogOut } from 'lucide-react';
+import { Search, Bell, Moon, Sun, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SidebarNav } from './SidebarNav';
 import { FloatingActionButton } from './FloatingActionButton';
@@ -8,9 +8,17 @@ interface LayoutProps {
   children: React.ReactNode;
   activeTab?: string;
   setActiveTab?: (tab: string) => void;
+  theme?: string;
+  onToggleTheme?: () => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children }) => {
+export const Layout: React.FC<LayoutProps> = ({
+  children,
+  activeTab,
+  setActiveTab,
+  theme,
+  onToggleTheme,
+}) => {
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -91,11 +99,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center gap-3">
             {/* Dark Mode toggle visual */}
             <button
+              onClick={onToggleTheme}
               className="p-2 flex items-center justify-center transition-colors min-h-[44px] min-w-[44px]"
               style={{ border: '1px solid var(--color-ink)' }}
               aria-label="Toggle theme"
             >
-              <Moon size={16} />
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
 
             {/* Notification Bell */}

@@ -190,9 +190,25 @@ const DashboardContent: React.FC = () => {
   // Synced backend settings fields
   const [signature, setSignature] = useState('');
   const [autoReply, setAutoReply] = useState(false);
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      return savedTheme;
+    }
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return systemPrefersDark ? 'dark' : 'light';
+  });
   const [timezone, setTimezone] = useState('UTC');
   const [digestSchedule, setDigestSchedule] = useState('daily');
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   // Digests list state
   const [digests, setDigests] = useState<any[]>([]);
@@ -425,7 +441,7 @@ const DashboardContent: React.FC = () => {
 
   if (activeTab === 'analytics') {
     return (
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+      <Layout activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}>
         {toastMessage && (
           <div
             className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 text-black font-black text-xs font-bold uppercase tracking-wider shadow-2xl"
@@ -442,7 +458,7 @@ const DashboardContent: React.FC = () => {
 
   if (activeTab === 'settings') {
     return (
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+      <Layout activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}>
         {toastMessage && (
           <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-indigo-600/95 border border-indigo-500/30 text-black font-black text-xs font-semibold shadow-2xl backdrop-blur-md animate-bounce">
             <Sparkles size={14} className="text-amber-300" />
@@ -1156,7 +1172,7 @@ const DashboardContent: React.FC = () => {
   }
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}>
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-indigo-600/95 border border-indigo-500/30 text-black font-black text-xs font-semibold shadow-2xl backdrop-blur-md animate-bounce">
           <Sparkles size={14} className="text-amber-300" />
